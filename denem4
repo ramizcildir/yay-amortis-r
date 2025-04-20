@@ -1,0 +1,138 @@
+import pygame
+import sys
+import math
+
+# --- Pygame Ayarları ---
+pygame.init()
+WIDTH, HEIGHT = 1200, 700
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Gerçekçi Süspansiyon Sistemi - Tek Tekerlek")
+clock = pygame.time.Clock()
+
+# --- Renkler ---
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (130, 130, 130)
+DARK_GRAY = (80, 80, 80)
+YELLOW = (255, 215, 0)
+BLUE = (100, 149, 237)
+RED = (200, 60, 60)
+METAL = (180, 180, 190)
+GREEN = (34, 139, 34)
+
+# --- Fiziksel Parametreler ---
+mass = 5.0              # Tekerleğe bağlı kütle (kg)
+k = 90.0                # Yay sabiti (N/m)
+c = 10.0                # Sönümleme katsayısı (N.s/m)
+g = 9.81                # Yerçekimi ivmesi (m/s^2)
+
+# --- Simülasyon Durumu ---
+y_rest = 400            # Dinlenme konumu
+wheel_y = y_rest        # Başlangıç konumu
+wheel_v = 0.0
+wheel_a = 0.0
+
+# --- Hareket (x ekseni boyunca yol) ---
+shock_x = 300
+shock_top = 200
+car_speed = 100.0       # px/s
+car_x = 300
+
+# --- Boyutlar ---
+wheel_radius = 50
+road_amplitude = 30
+road_frequency = 0.005
+
+# --- Yay çizimi ---
+def draw_spring(x, y1, y2, coils=10, width=20):
+    length = y2 - y1
+    seg_len = length / coils
+    points = []
+    direction = 1
+    for i in range(coils + 1):
+        px = x + width * direction if i not in [0, coils] else x
+        py = y1 + i * seg_len
+        points.append((px, py))
+        direction *= -1
+    pygame.draw.lines(screen, YELLOW, False, points, 4)
+
+# --- Amortisör çizimi ---
+def draw_damper(x, y1, y2):
+    pygame.draw.line(screen, DARK_GRAY, (x, y1), (x, y2), 8)
+    pygame.draw.circle(screen, DARK_GRAY, (x, int(y1)), 6)
+    pygame.draw.circle(screen, DARK_GRAY, (x, int(y2)), 6)
+
+# --- Tekerlek çizimi ---
+def draw_wheel(x, y):
+    pygame.draw.circle(screen, BLACK, (int(x), int(y)), wheel_radius)
+    pygame.draw.circle(screen, GRAY, (int(x), int(y)), wheel_radius - 6)
+
+# --- Alt bağlantı kolları ---
+def draw_arms(x, y):
+    arm_len = 100
+    offset = 80
+    pygame.draw.line(screen, METAL, (x - offset, shock_top), (x - 30, y), 10)
+    pygame.draw.line(screen, METAL, (x + offset, shock_top), (x + 30, y), 10)
+
+# --- Yol çizimi ---
+def draw_road(time):
+    pygame.draw.rect(screen, GREEN, (0, y_rest + wheel_radius, WIDTH, HEIGHT - y_rest))
+    for x in range(0, WIDTH, 10):
+        y = y_rest + wheel_radius + math.sin((x + time * car_speed) * road_frequency) * road_amplitude
+        pygame.draw.circle(screen, DARK_GRAY, (x, int(y)), 2)
+
+# --- Yol yüksekliği ---
+def get_road_height(x, time):
+    return y_rest + wheel_radius + math.sin((x + time * car_speed) * road_frequency) * road_amplitude
+
+# --- Fizik Güncellemesi ---
+def update_physics(dt, road_y):
+    global wheel_y, wheel_v, wheel_a
+    dy = wheel_y - road_y
+    spring_force = -k * dy
+    damping_force = -c * wheel_v
+    net_force = spring_force + damping_force + mass * g
+    wheel_a = net_force / mass
+    wheel_v += wheel_a * dt
+    wheel_y += wheel_v * dt
+
+# --- Ana döngü ---
+def main():
+    global wheel_v, car_x
+    running = True
+    total_time = 0
+
+    while running:
+        dt = clock.tick(60) / 1000.0
+        total_time += dt
+        screen.fill(WHITE)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE]:
+            wheel_v = -10
+
+        # Araba ileri hareket etsin
+        car_x += car_speed * dt
+
+        # Yol yüksekliği al ve fizik uygula
+        road_y = get_road_height(car_x, total_time)
+        update_physics(dt, road_y)
+
+        # Çizimler
+        draw_road(total_time)
+        draw_arms(car_x, wheel_y)
+        draw_spring(car_x, shock_top, wheel_y - wheel_radius)
+        draw_damper(car_x, shock_top, wheel_y - wheel_radius)
+        draw_wheel(car_x, wheel_y)
+
+        pygame.display.flip()
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
