@@ -1,0 +1,128 @@
+import pygame
+import sys
+import math
+
+# Pygame başlangıç
+pygame.init()
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Kütle-Yay-Amortisör Simülasyonu")
+
+# Renkler
+WHITE = (255, 255, 255)
+BLUE = (100, 149, 237)
+RED = (255, 99, 71)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+
+# Zaman ayarı
+clock = pygame.time.Clock()
+dt = 0.016  # ~60 FPS
+
+# Sistem sabitleri
+mass = 2.0               # kg
+k = 50.0                 # N/m (yay sabiti)
+c = 5.0                  # Ns/m (amortisör katsayısı)
+equilibrium_y = 300      # Yayın denge noktası
+gravity = 9.81           # m/s²
+
+# Başlangıç durumları
+y = 400.0                # Başlangıç pozisyonu
+v = 0.0                  # Hız
+a = 0.0                  # İvme
+
+# Grafik ayarları
+mass_width = 80
+mass_height = 40
+
+font = pygame.font.SysFont("Arial", 20)
+
+def draw_spring(start_y, end_y, segments=20):
+    """Yayı çiz (zigzag biçiminde)"""
+    x_center = WIDTH // 2
+    spring_width = 30
+    segment_length = (end_y - start_y) / segments
+    points = []
+    direction = 1
+
+    for i in range(segments + 1):
+        x = x_center + (spring_width * direction if i not in [0, segments] else 0)
+        y_pos = start_y + i * segment_length
+        points.append((x, y_pos))
+        direction *= -1
+
+    pygame.draw.lines(screen, BLUE, False, points, 4)
+
+def draw_mass(y_pos):
+    """Kütleyi çiz"""
+    rect = pygame.Rect(WIDTH//2 - mass_width//2, int(y_pos), mass_width, mass_height)
+    pygame.draw.rect(screen, RED, rect)
+    pygame.draw.rect(screen, BLACK, rect, 2)
+
+def draw_info():
+    """Sistem bilgilerini ekrana yaz"""
+    info_texts = [
+        f"Kütle (m): {mass:.2f} kg",
+        f"Yay Sabiti (k): {k:.2f} N/m",
+        f"Amortisör (c): {c:.2f} Ns/m",
+        f"Hız: {v:.2f} m/s",
+        f"İvme: {a:.2f} m/s²"
+    ]
+    for i, text in enumerate(info_texts):
+        label = font.render(text, True, BLACK)
+        screen.blit(label, (10, 10 + i * 25))
+
+def update_physics():
+    global y, v, a
+    displacement = y - equilibrium_y
+    spring_force = -k * displacement
+    damping_force = -c * v
+    net_force = spring_force + damping_force + mass * gravity
+    a = net_force / mass
+    v += a * dt
+    y += v * dt
+
+def handle_input():
+    global k, c, mass, v
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_UP]:
+        k += 10 * dt
+    if keys[pygame.K_DOWN]:
+        k = max(0, k - 10 * dt)
+    if keys[pygame.K_LEFT]:
+        c = max(0, c - 10 * dt)
+    if keys[pygame.K_RIGHT]:
+        c += 10 * dt
+    if keys[pygame.K_w]:
+        mass += 0.5 * dt
+    if keys[pygame.K_s]:
+        mass = max(0.5, mass - 0.5 * dt)
+    if keys[pygame.K_SPACE]:
+        v = -5  # zıplat
+
+def main():
+    global dt
+    running = True
+    while running:
+        screen.fill(WHITE)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        handle_input()
+        update_physics()
+
+        # Çizim
+        draw_spring(equilibrium_y - 50, y)
+        draw_mass(y)
+        draw_info()
+
+        pygame.display.flip()
+        dt = clock.tick(60) / 1000.0  # saniye cinsinden
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
