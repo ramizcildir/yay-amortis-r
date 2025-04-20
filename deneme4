@@ -1,0 +1,156 @@
+# suspension_simulation.py
+# 2D Quarter-Car Suspension Simulation using Pygame
+# Complex simulation with car body, spring-damper, tire, terrain
+
+import pygame
+import math
+import random
+
+# Constants
+WIDTH, HEIGHT = 1000, 600
+FPS = 60
+GRAVITY = 9.81
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREY = (50, 50, 50)
+YELLOW = (255, 255, 0)
+BLUE = (50, 150, 255)
+GREEN = (0, 255, 0)
+
+# Physics Parameters
+CAR_MASS = 300.0  # kg
+TIRE_MASS = 50.0  # kg
+SPRING_K = 15000.0  # N/m
+DAMPER_C = 1200.0  # Ns/m
+TIRE_K = 100000.0  # N/m
+
+# Geometry
+CAR_WIDTH = 120
+CAR_HEIGHT = 40
+TIRE_RADIUS = 40
+
+class Road:
+    def __init__(self):
+        self.bump_amplitude = 30
+        self.bump_frequency = 0.01
+
+    def height(self, x):
+        return HEIGHT - 50 + math.sin(x * self.bump_frequency) * self.bump_amplitude
+
+class Tire:
+    def __init__(self, x):
+        self.x = x
+        self.y = HEIGHT - 100
+        self.vy = 0.0
+        self.mass = TIRE_MASS
+
+    def apply_force(self, force, dt):
+        ay = force / self.mass
+        self.vy += ay * dt
+        self.y += self.vy * dt
+
+    def draw(self, screen):
+        pygame.draw.circle(screen, BLACK, (int(self.x), int(self.y)), TIRE_RADIUS)
+
+class CarBody:
+    def __init__(self, x):
+        self.x = x
+        self.y = HEIGHT - 200
+        self.vy = 0.0
+        self.mass = CAR_MASS
+
+    def apply_force(self, force, dt):
+        ay = force / self.mass
+        self.vy += ay * dt
+        self.y += self.vy * dt
+
+    def draw(self, screen):
+        rect = pygame.Rect(0, 0, CAR_WIDTH, CAR_HEIGHT)
+        rect.center = (self.x, self.y)
+        pygame.draw.rect(screen, BLUE, rect)
+
+class SpringDamper:
+    def __init__(self, car, tire):
+        self.car = car
+        self.tire = tire
+        self.rest_length = 80
+
+    def compute_force(self):
+        dx = self.car.y - self.tire.y
+        dv = self.car.vy - self.tire.vy
+        spring_force = -SPRING_K * (dx - self.rest_length)
+        damper_force = -DAMPER_C * dv
+        total_force = spring_force + damper_force
+        return total_force
+
+    def draw(self, screen):
+        pygame.draw.line(screen, YELLOW, (self.car.x, self.car.y), (self.tire.x, self.tire.y), 5)
+
+class SuspensionSystem:
+    def __init__(self):
+        self.car = CarBody(WIDTH // 2)
+        self.tire = Tire(WIDTH // 2)
+        self.spring = SpringDamper(self.car, self.tire)
+        self.road = Road()
+
+    def update(self, dt):
+        road_y = self.road.height(self.tire.x)
+        tire_compression = max(0, road_y - (self.tire.y + TIRE_RADIUS))
+
+        road_force = TIRE_K * tire_compression if tire_compression > 0 else 0
+        spring_force = self.spring.compute_force()
+
+        # Forces on tire: gravity, spring upward, road upward
+        tire_force = -road_force + spring_force - self.tire.mass * GRAVITY
+        self.tire.apply_force(tire_force, dt)
+
+        # Forces on car: spring downward + gravity
+        car_force = -spring_force - self.car.mass * GRAVITY
+        self.car.apply_force(car_force, dt)
+
+        # Correct tire position if it penetrates ground
+        if self.tire.y + TIRE_RADIUS > road_y:
+            self.tire.y = road_y - TIRE_RADIUS
+            self.tire.vy = 0
+
+    def draw(self, screen):
+        self.road_line(screen)
+        self.tire.draw(screen)
+        self.car.draw(screen)
+        self.spring.draw(screen)
+
+    def road_line(self, screen):
+        points = []
+        for x in range(0, WIDTH, 10):
+            y = self.road.height(x)
+            points.append((x, y))
+        pygame.draw.lines(screen, GREEN, False, points, 3)
+
+class Simulator:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("2D Car Suspension Simulation")
+        self.clock = pygame.time.Clock()
+        self.system = SuspensionSystem()
+        self.running = True
+
+    def run(self):
+        while self.running:
+            dt = self.clock.tick(FPS) / 1000.0
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+
+            self.system.update(dt)
+            self.screen.fill(WHITE)
+            self.system.draw(self.screen)
+            pygame.display.flip()
+
+        pygame.quit()
+
+if __name__ == "__main__":
+    sim = Simulator()
+    sim.run()
