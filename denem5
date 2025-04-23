@@ -1,0 +1,39 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Temel sabitler
+mass = 300  # kg, çeyrek araç kütlesi
+time = np.linspace(0, 10, 1000)  # 0-10 saniye arası 1000 zaman noktası
+
+# Yay kalınlıkları (örnek) ve bunlara karşılık gelen yay sabitleri (k)
+spring_thicknesses = [10, 15, 20, 25]  # mm
+spring_constants = [3000 + 100*t for t in spring_thicknesses]  # N/m, basit tahmini model
+
+# Sönüm katsayıları (c)
+damping_coeffs = [200, 500, 1000, 2000]  # Ns/m
+
+# Başlangıç koşulları: [başlangıç konumu, başlangıç hızı]
+y0 = [0.1, 0.0]  # 10 cm'lik bir ilk yer değiştirme, hız sıfır
+
+# Diferansiyel denklem: m*y'' + c*y' + k*y = 0
+def suspension_ode(t, y, m, c, k):
+    return [y[1], -c/m*y[1] - k/m*y[0]]
+
+# Grafik çizimi
+plt.figure(figsize=(10, 6))
+for k_val, k in zip(spring_thicknesses, spring_constants):
+    for c in damping_coeffs:
+        # Belirli kombinasyonlar için sadece grafik çiziyoruz (hepsi için değil)
+        if c in [200, 1000] and k_val in [10, 20]:
+            sol = solve_ivp(suspension_ode, [time[0], time[-1]], y0, t_eval=time, args=(mass, c, k))
+            plt.plot(sol.t, sol.y[0], label=f"k={k} N/m, c={c} Ns/m")
+
+# Grafik ayarları
+plt.title("Süspansiyon Sistemi Yer Değiştirme Grafiği")
+plt.xlabel("Zaman (s)")
+plt.ylabel("Yer Değiştirme (m)")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.show()
