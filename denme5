@@ -1,0 +1,81 @@
+# Car Suspension Simulation with Pygame
+# Author: python (ChatGPT)
+# Description: Advanced mass-spring-damper simulation of car suspension in Pygame.
+
+import pygame
+import math
+import random
+
+# Constants for simulation
+WIDTH, HEIGHT = 1000, 600
+GROUND_LEVEL = HEIGHT - 100
+FPS = 60
+
+# Colors
+WHITE = (255, 255, 255)
+GRAY = (180, 180, 180)
+BLACK = (0, 0, 0)
+RED = (200, 50, 50)
+BLUE = (50, 50, 200)
+GREEN = (50, 200, 50)
+
+# Physics parameters
+GRAVITY = 9.81
+
+# Car and suspension parameters
+class Config:
+    MASS = 250.0  # kg per corner
+    K = 15000.0   # N/m
+    C = 1200.0    # Ns/m
+    SPRING_LENGTH = 100
+    MAX_SPRING_COMPRESSION = 80
+
+class MassSpringDamper:
+    def __init__(self, mass, k, c, rest_length):
+        self.mass = mass
+        self.k = k
+        self.c = c
+        self.rest_length = rest_length
+        self.position = rest_length
+        self.velocity = 0.0
+        self.acceleration = 0.0
+        self.external_force = 0.0
+
+    def apply_force(self, force):
+        self.external_force += force
+
+    def update(self, dt, ground_height):
+        x = self.position - ground_height - self.rest_length
+        spring_force = -self.k * x
+        damping_force = -self.c * self.velocity
+        net_force = spring_force + damping_force + self.external_force - self.mass * GRAVITY
+
+        self.acceleration = net_force / self.mass
+        self.velocity += self.acceleration * dt
+        self.position += self.velocity * dt
+
+        # reset external force
+        self.external_force = 0.0
+
+    def get_spring_compression(self):
+        return max(0.0, self.rest_length - (self.position - (GROUND_LEVEL - self.rest_length)))
+
+class Wheel:
+    def __init__(self, x, y):
+        self.x = x
+        self.base_y = y
+        self.suspension = MassSpringDamper(
+            mass=Config.MASS,
+            k=Config.K,
+            c=Config.C,
+            rest_length=Config.SPRING_LENGTH
+        )
+
+    def update(self, dt):
+        ground_y = GROUND_LEVEL
+        self.suspension.update(dt, ground_y)
+
+    def draw(self, surface):
+        y = self.base_y + self.suspension.position - Config.SPRING_LENGTH
+        pygame.draw.line(surface, GREEN, (self.x, self.base_y), (self.x, y), 4)
+        pygame.draw.circle(surface, BLUE, (self.x, int(y)), 20)
